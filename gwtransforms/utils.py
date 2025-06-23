@@ -1,7 +1,7 @@
 from typing import Hashable, Mapping
 
-from numpy.typing import ArrayLike, NDArray
 import numpy as np
+from numpy.typing import ArrayLike, NDArray
 
 
 def stack_dict_keys_into_array(
@@ -22,13 +22,13 @@ def combine_arrays(arrays, shape):
     return np.stack(arrays, axis=-1).reshape(*arr_shape, *shape)
 
 
-def unpack_parameter_dim(array: NDArray, axis: int = -1) -> NDArray:
+def unpack_parameter_dim(array: ArrayLike, axis: int = -1) -> NDArray:
     """
     Swap axes of an array so that the `axis` dimension comes first.
 
     Parameters
     ----------
-    array : NDArray
+    array : ArrayLike
         Input array
     axis : int, optional
         Axis to unpack, by default -1
@@ -56,6 +56,7 @@ def unpack_parameter_dim(array: NDArray, axis: int = -1) -> NDArray:
     >>> x.shape, y.shape
     ((5, 3), (5, 3))
     """
+    array = np.asanyarray(array)
     return np.moveaxis(array, axis, 0)
 
 

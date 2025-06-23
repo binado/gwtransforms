@@ -1,42 +1,16 @@
 import numpy as np
 import pytest
-import sympy as sp
 from astropy.cosmology import Planck18
 
-from gwtransforms.symbolic import get_all_mass_symbolic_transforms
 from gwtransforms.transforms import (
     ComponentMassesToChirpMassAndSymmetricMassRatio,
     ComponentMassesToPrimaryMassAndMassRatio,
     ComponentMassesToTotalMassAndMassRatio,
     RedshiftToLuminosityDistance,
-    SourceFrameToDetectorFrameMasses,
     TotalMassAndMassRatioToChirpMassAndSymmetricMassRatio,
     construct_jacobian,
 )
 from gwtransforms.utils import stack_dict_keys_into_array
-
-symbolic_transforms = get_all_mass_symbolic_transforms()
-
-
-@pytest.fixture
-def mass_arrays():
-    m1 = 30
-    m2 = 20
-    q = m2 / m1
-    mt = m1 + m2
-    nu = q / (1 + q) ** 2
-    mc = mt * nu**0.6
-    batch_shape = (10,)
-    inputs = (
-        "mass_1",
-        "mass_2",
-        "mass_ratio",
-        "total_mass",
-        "symmetric_mass_ratio",
-        "chirp_mass",
-    )
-    arrays = tuple(map(lambda x: x * np.ones(batch_shape), (m1, m2, q, mt, nu, mc)))
-    return dict(zip(inputs, arrays))
 
 
 @pytest.mark.parametrize(
@@ -56,7 +30,9 @@ def mass_arrays():
         ),
     ],
 )
-def test_analytical_mass_transforms(transform, transform_name, mass_arrays):
+def test_analytical_mass_transforms(
+    transform, transform_name, symbolic_transforms, mass_arrays
+):
     x = stack_dict_keys_into_array(mass_arrays, *transform.inputs)
     symbolic_transform = symbolic_transforms[transform_name]
     assert transform.inputs == symbolic_transform.inputs
@@ -64,13 +40,13 @@ def test_analytical_mass_transforms(transform, transform_name, mass_arrays):
     y, sym_y = transform(x), symbolic_transform(x)
     assert np.allclose(y, sym_y)
     x_from_inv = transform._inverse(y)
-    x_sym_from_inv = symbolic_transform.inverse(sym_y)
+    x_sym_from_inv = symbolic_transform._inverse(sym_y)
     assert np.allclose(x_from_inv, x_sym_from_inv)
     jacobian = transform.jacobian(x, y)
     sym_jacobian = symbolic_transform.jacobian(x, sym_y)
     assert np.allclose(jacobian, sym_jacobian)
-    inv_jacobian = transform.inverse_jacobian(x, y)
-    sym_inv_jacobian = symbolic_transform.inverse_jacobian(x, sym_y)
+    inv_jacobian = transform._inverse_jacobian(x, y)
+    sym_inv_jacobian = symbolic_transform._inverse_jacobian(x, sym_y)
     assert np.allclose(inv_jacobian, sym_inv_jacobian)
 
 
@@ -89,15 +65,13 @@ def test_construct_jacobian():
         TotalMassAndMassRatioToChirpMassAndSymmetricMassRatio(),
         redshift_to_luminosity_distance_transform,
     ]
+    combined_transform = ComponentMassesToChirpMassAndSymmetricMassRatio()
     new_params, new_dims, jacobian = construct_jacobian(transforms, params, dims)
-    new_masses, combined_mass_jacobian = (
-        ComponentMassesToChirpMassAndSymmetricMassRatio().transform_and_jacobian(
-            params[:, :2]  # (m1, m2)
-        )
-    )
-    dl, ddl_dz = redshift_to_luminosity_distance_transform.transform_and_jacobian(
-        params[:, -1]
-    )
+    new_masses = combined_transform(params[:, :2])
+    combined_mass_jacobian = combined_transform.jacobian(params[:, :2], new_masses)
+    dl = redshift_to_luminosity_distance_transform(params[:, -1])
+    ddl_dz = redshift_to_luminosity_distance_transform.jacobian(params[:, -1], dl)
+    ddl_dz = np.asanyarray(ddl_dz)
     assert new_dims == {
         "chirp_mass": 0,
         "symmetric_mass_ratio": 1,

@@ -3,17 +3,17 @@ from typing import Sequence
 
 import numpy as np
 import sympy as sp
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 from sympy.utilities.iterables import flatten
 
-from gwtransforms.utils import combine_into_jacobian, unpack_parameter_dim
+from gwtransforms.transforms.base import ParameterTransform
+from gwtransforms.utils import unpack_parameter_dim
 
 
 @dataclass
-class SymbolicTransform:
+class SymbolicTransform(ParameterTransform):
     inputs: tuple[str, ...]
     outputs: tuple[str, ...]
-
     input_symbols: tuple[sp.Symbol, ...]
     output_symbols: tuple[sp.Symbol, ...]
     forward_exprs: sp.Matrix
@@ -29,14 +29,6 @@ class SymbolicTransform:
             self.output_symbols, self.inverse_jacobian_exprs
         )
 
-    @property
-    def ninputs(self):
-        return len(self.inputs)
-
-    @property
-    def noutputs(self):
-        return len(self.outputs)
-
     def lambdify(self, args, expr):
         if isinstance(expr, sp.Matrix):
             _expr = expr.tolist()
@@ -46,31 +38,35 @@ class SymbolicTransform:
             raise ValueError("Wrong format for expr")
         return sp.lambdify(args, _expr, modules="numpy")
 
-    def _vectorize(self, x: NDArray, lambdified_fn, dims: tuple[int, ...]) -> NDArray:
+    def _vectorize(self, x: NDArray, lambdified_fn, dims: tuple[int, ...]) -> ArrayLike:
         res = lambdified_fn(*unpack_parameter_dim(x))
         flattened = flatten(res, cls=list)
         arrs = np.broadcast_arrays(*flattened)
         return np.stack(arrs, axis=-1).reshape(-1, *dims)
 
     def det(self) -> sp.Expr:
-        return self.jacobian_exprs.det()
+        det = self.jacobian_exprs.det()
+        if not isinstance(det, sp.Expr):
+            raise ValueError("Expected det() to return sympy.Expr object")
+        return det
 
-    def _log_abs_det_jacobian(self):
-        return sp.log(abs(self.det()))
-
-    def __call__(self, x: NDArray) -> NDArray:
+    def __call__(self, x: ArrayLike) -> ArrayLike:
         dims = (self.noutputs,)
+        x = np.asanyarray(x)
         return self._vectorize(x, self._forward_numpy, dims=dims)
 
-    def inverse(self, y: NDArray) -> NDArray:
+    def _inverse(self, y: ArrayLike) -> ArrayLike:
+        y = np.asanyarray(y)
         dims = (self.ninputs,)
         return self._vectorize(y, self._inverse_numpy, dims=dims)
 
-    def jacobian(self, x: NDArray, y: NDArray) -> NDArray:
+    def jacobian(self, x: ArrayLike, y: ArrayLike) -> ArrayLike:
+        x = np.asanyarray(x)
         dims = (self.noutputs, self.ninputs)
         return self._vectorize(x, self._jacobian_numpy, dims=dims)
 
-    def inverse_jacobian(self, x: NDArray, y: NDArray) -> NDArray:
+    def _inverse_jacobian(self, x: ArrayLike, y: ArrayLike) -> ArrayLike:
+        y = np.asanyarray(y)
         dims = (self.ninputs, self.noutputs)
         return self._vectorize(y, self._inv_jacobian_numpy, dims=dims)
 
