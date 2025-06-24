@@ -6,9 +6,9 @@ from gwtransforms.transforms.base import ParameterTransform
 
 
 def dl_to_z(dl: float | ArrayLike, cosmology: astropy.cosmology.FLRW):
-    import astropy.units as u
+    from astropy import units
 
-    return astropy.cosmology.z_at_value(cosmology.luminosity_distance, dl * u.Mpc).value
+    return astropy.cosmology.z_at_value(cosmology.luminosity_distance, dl * units.Mpc)
 
 
 class RedshiftToLuminosityDistance(ParameterTransform):
@@ -41,6 +41,7 @@ class RedshiftToLuminosityDistance(ParameterTransform):
         return self.cosmology.luminosity_distance(x).value
 
     def _inverse(self, y: ArrayLike) -> ArrayLike:
+        y = np.asanyarray(y)
         return dl_to_z(y, self.cosmology)
 
     def jacobian(self, x: ArrayLike, y: ArrayLike) -> ArrayLike:

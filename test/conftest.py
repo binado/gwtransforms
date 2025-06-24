@@ -26,5 +26,11 @@ def mass_arrays():
 
 
 @pytest.fixture
+def redshift_array():
+    batch_size = 10
+    return np.geomspace(1e-4, 1e0, batch_size)
+
+
+@pytest.fixture
 def symbolic_transforms():
     return get_all_mass_symbolic_transforms()
