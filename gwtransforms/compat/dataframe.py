@@ -92,4 +92,25 @@ class DataFrameParameterTransform(ParameterTransformT[pd.Series | pd.DataFrame])
 def with_pandas(
     transform: ParameterTransform, in_place: bool = False
 ) -> ParameterTransformT[pd.Series | pd.DataFrame]:
+    """
+    Wrap `transform` into an object that can be used with
+    `pandas.Series` and `pandas.DataFrame`.
+
+    Parameters
+    ----------
+    transform: ParameterTransform
+        A parameter transform acting on `numpy` arrays
+    in_place: bool
+        Whether to modifiy the `Series` or `DataFrame` in place
+    when possible. Defaults to `False`
+
+    Returns
+    -------
+    ParameterTransformT[pd.Series | pd.DataFrame]
+        The wrapped transform
+
+    Examples
+    --------
+
+    """
     return DataFrameParameterTransform(transform, in_place=in_place)
